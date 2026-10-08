@@ -45,7 +45,7 @@ export default function ApiKeyModal({ onSave, onClose, overlay = false, title, s
           </h1>
           <p className="text-white/40 text-[13px] leading-relaxed px-4">
             {subtitle || (
-              <>{copy.subtitlePrefix} <a href="https://muapi.ai/access-keys" target="_blank" rel="noreferrer" className="text-[#22d3ee] hover:text-[#e5ff33] transition-colors">Muapi.ai</a> {copy.subtitleSuffix}</>
+              <>{copy.subtitlePrefix} <a href="https://higgsfield.ai/higgsfield-api" target="_blank" rel="noreferrer" className="text-[#22d3ee] hover:text-[#e5ff33] transition-colors">Higgsfield</a> {copy.subtitleSuffix}</>
             )}
           </p>
         </div>
@@ -76,7 +76,7 @@ export default function ApiKeyModal({ onSave, onClose, overlay = false, title, s
 
           <p className="text-center text-[12px] text-white/20 pt-2">
             {copy.needKey}{' '}
-            <a href="https://muapi.ai/access-keys" target="_blank" rel="noreferrer" className="text-white/40 hover:text-[#22d3ee] transition-colors font-medium">
+            <a href="https://higgsfield.ai/higgsfield-api" target="_blank" rel="noreferrer" className="text-white/40 hover:text-[#22d3ee] transition-colors font-medium">
               {copy.getOneFree}
             </a>
           </p>

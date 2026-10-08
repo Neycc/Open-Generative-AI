@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
-import { ImageStudio, VideoStudio, ClippingStudio, MotionControlStudio, VibeMotionStudio, LipSyncStudio, RecastStudio, CinemaStudio, AudioStudio, MarketingStudio, WorkflowStudio, AgentStudio, AppsStudio, AiInfluencerStudio, LayersStudio, getUserBalance } from 'studio';
+import { ImageStudio, VideoStudio, ClippingStudio, MotionControlStudio, VibeMotionStudio, LipSyncStudio, RecastStudio, CinemaStudio, AudioStudio, MarketingStudio, WorkflowStudio, AgentStudio, AppsStudio, AiInfluencerStudio, LayersStudio } from 'studio';
 
 const DesignAgentStudio = dynamic(() => import('studio').then(mod => mod.DesignAgentStudio), {
   ssr: false,
@@ -18,7 +18,7 @@ import { getCommonCopy, getLocaleConfig, localizeStudioPath } from '@/lib/locale
 // per-locale from `copy.tabs`/`copy.categories` via tabLabel()/categoryLabel()
 // inside the component below, with these English strings as the fallback
 // when a locale bundle is missing the key.
-const TABS = [
+const ALL_TABS = [
   {
     id: 'image',
     label: 'Image Studio',
@@ -207,7 +207,7 @@ const TABS = [
   }
 ];
 
-const NAVIGATION_CATEGORIES = [
+const ALL_NAVIGATION_CATEGORIES = [
   {
     id: 'images',
     label: 'Images',
@@ -260,13 +260,18 @@ const NAVIGATION_CATEGORIES = [
   }
 ];
 
+const ENABLED_TABS = new Set(['image', 'video']);
+const TABS = ALL_TABS.filter((tab) => ENABLED_TABS.has(tab.id));
+const NAVIGATION_CATEGORIES = ALL_NAVIGATION_CATEGORIES
+  .map((category) => ({ ...category, tabIds: category.tabIds.filter((tabId) => ENABLED_TABS.has(tabId)) }))
+  .filter((category) => category.tabIds.length > 0);
 const EXPLORE_APPS_TAB = TABS.find((tab) => tab.id === 'apps');
 
 const getNavigationCategory = (tabId) => (
   NAVIGATION_CATEGORIES.find((category) => category.tabIds.includes(tabId))
 );
 
-const STORAGE_KEY = 'muapi_key';
+const STORAGE_KEY = 'higgsfield_api_key';
 const NOTIFICATIONS_STORAGE_KEY = 'open_gen_notifications_v1';
 const MAX_VISIBLE_NOTIFICATIONS = 3;
 
@@ -344,7 +349,6 @@ export default function StandaloneShell({ locale = 'en' }) {
   const [apiKey, setApiKey] = useState(null);
   const [activeTab, setActiveTab] = useState(getInitialTab());
 
-  const [balance, setBalance] = useState(null);
   const [showSettings, setShowSettings] = useState(false);
   const [isHeaderVisible, setIsHeaderVisible] = useState(true);
   const [hasMounted, setHasMounted] = useState(false);
@@ -447,14 +451,7 @@ export default function StandaloneShell({ locale = 'en' }) {
     return () => window.clearTimeout(timer);
   }, [notifications]);
 
-  const fetchBalance = useCallback(async (key) => {
-    try {
-      const data = await getUserBalance(key);
-      setBalance(data.balance);
-    } catch (err) {
-      console.error('Balance fetch failed:', err);
-    }
-  }, []);
+  const fetchBalance = useCallback(async () => null, []);
 
   const makeSuccessCallback = useCallback((tabId) => (data) => {
     const tab = TABS.find(t => t.id === tabId);
@@ -576,34 +573,28 @@ export default function StandaloneShell({ locale = 'en' }) {
 
   useEffect(() => {
     setHasMounted(true);
+    localStorage.removeItem('muapi_key');
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored) {
       setApiKey(stored);
-      fetchBalance(stored);
-      // Sync cookie immediately on mount to establish identity for background requests
-      document.cookie = `muapi_key=${stored}; path=/; max-age=31536000; SameSite=Lax`;
     }
   }, [fetchBalance]);
 
   const handleKeySave = useCallback((key) => {
     localStorage.setItem(STORAGE_KEY, key);
     setApiKey(key);
-    fetchBalance(key);
-    document.cookie = `muapi_key=${key}; path=/; max-age=31536000; SameSite=Lax`;
   }, [fetchBalance]);
 
   const handleKeyChange = useCallback(() => {
     localStorage.removeItem(STORAGE_KEY);
     setApiKey(null);
-    setBalance(null);
-    document.cookie = "muapi_key=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
   }, []);
 
   // Inject API key into all outgoing Axios requests (prop-based approach)
   // We use an interceptor to be selective and NOT send the key to external domains like S3
   useEffect(() => {
     // Safety: Clear any global defaults that might have been set previously
-    delete axios.defaults.headers.common['x-api-key'];
+    delete axios.defaults.headers.common['Authorization'];
 
     if (!apiKey) return;
 
@@ -613,7 +604,7 @@ export default function StandaloneShell({ locale = 'en' }) {
       const isInternalProxy = config.url.includes('/api/app') || config.url.includes('/api/workflow') || config.url.includes('/api/agents') || config.url.includes('/api/api') || config.url.includes('/api/v1');
 
       if (isRelative || isInternalProxy) {
-        config.headers['x-api-key'] = apiKey;
+        config.headers['Authorization'] = `Key ${apiKey}`;
       }
       
       return config;
@@ -624,12 +615,6 @@ export default function StandaloneShell({ locale = 'en' }) {
     };
   }, [apiKey]);
 
-  // Poll for balance every 30 seconds if key is present
-  useEffect(() => {
-    if (!apiKey) return;
-    const interval = setInterval(() => fetchBalance(apiKey), 30000);
-    return () => clearInterval(interval);
-  }, [apiKey, fetchBalance]);
 
   // Drag and Drop Handlers
   const handleDragOver = useCallback((e) => {
@@ -799,7 +784,7 @@ export default function StandaloneShell({ locale = 'en' }) {
             <div className="flex items-center gap-2.5 bg-white/5 px-3 py-1.5 rounded-full border border-white/5 transition-colors">
               <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
               <span className="text-xs font-bold text-white/90">
-                ${balance !== null ? `${balance}` : '---'}
+                Higgsfield API
               </span>
             </div>
 

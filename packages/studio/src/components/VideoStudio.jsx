@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback, useMemo, useId } from "react";
 import toast, { Toaster } from "react-hot-toast";
-import { generateVideo, generateI2V, processV2V, uploadFile } from "../muapi.js";
+import { generateVideo, generateI2V, processV2V, uploadFile } from "../higgsfield.js";
 import { formatErrorMessage } from "../utils/formatError.js";
 import { scopedPersistKey, migrateLegacyPersistKey } from "../persistKey.js";
 import DrawModal from "./DrawModal.jsx";
@@ -21,12 +21,12 @@ import {
   getResolutionsForI2VModel,
   getEffectsForI2VModel,
   getDefaultEffectForI2VModel,
-} from "../models.js";
+} from "../higgsfieldModels.js";
 import {
   getFamilyVariant,
   videoModelCatalog,
-  videoModelMenuEntries as videoModelPickerEntries,
-  videoModelMenuEntryByVariantId as videoModelPickerEntryByVariantId,
+  videoModelMenuEntries as allVideoModelPickerEntries,
+  videoModelMenuEntryByVariantId as allVideoModelPickerEntryByVariantId,
 } from "../modelFamilies.js";
 import { getSeedanceEndpointResolution, getSeedanceToolConfiguration } from "../seedanceModels.js";
 import { getVeoToolConfiguration } from "../veoModels.js";
@@ -403,33 +403,15 @@ const VideoReadySvg = () => (
 
 // ── Dropdown components ───────────────────────────────────────────────────────
 
-const PROVIDER_LOGOS = {
-  openai: "https://cdn.muapi.ai/models/openai.png",
-  google: "https://cdn.muapi.ai/models/gemini.png",
-  kling: "https://cdn.muapi.ai/models/kling.png",
-  alibaba: "https://cdn.muapi.ai/models/alibaba.png",
-  bytedance: "https://cdn.muapi.ai/models/bytedance.png",
-  blackforest: "https://cdn.muapi.ai/models/bfl.png",
-  minimax: "https://cdn.muapi.ai/models/minimax.png",
-  suno: "https://cdn.muapi.ai/models/suno.png",
-  anthropic: "https://cdn.muapi.ai/models/claude.png",
-  meshy: "https://cdn.muapi.ai/models/meshy-3.png",
-  tripo3d: "https://cdn.muapi.ai/models/tripo3d.png",
-  grok: "https://cdn.muapi.ai/models/xai.png",
-  muapi: "https://cdn.muapi.ai/models/muapi.png",
-  midjourney: "https://cdn.muapi.ai/models/midjourney.png",
-  vidu: "https://cdn.muapi.ai/models/vidu.png",
-  runway: "https://cdn.muapi.ai/models/runway.png",
-  luma: "https://cdn.muapi.ai/models/luma.png",
-  ideogram: "https://cdn.muapi.ai/models/ideogram.png",
-  leonardoai: "https://cdn.muapi.ai/models/leonardoai.png",
-  hunyuan: "https://cdn.muapi.ai/models/hunyuan.png",
-  hidream: "https://cdn.muapi.ai/models/hidream.png",
-  lightricks: "https://cdn.muapi.ai/models/lightricks.png",
-  pixverse: "https://cdn.muapi.ai/models/pixverse.png",
-  reve: "https://cdn.muapi.ai/models/reve.png",
-  stability: "https://cdn.muapi.ai/models/stability.png"
-};
+const HIGGSFIELD_VIDEO_IDS = new Set(t2vModels.map((model) => model.id));
+const videoModelPickerEntries = allVideoModelPickerEntries
+  .filter((entry) => [...entry.variantIds].some((id) => HIGGSFIELD_VIDEO_IDS.has(id)))
+  .map((entry) => ({ ...entry, family: { ...entry.family, provider: 'higgsfield', provider_name: 'Higgsfield' } }));
+const videoModelPickerEntryByVariantId = new Map(
+  [...allVideoModelPickerEntryByVariantId.entries()].filter(([id]) => HIGGSFIELD_VIDEO_IDS.has(id))
+);
+
+const PROVIDER_LOGOS = { higgsfield: '' };
 
 const invertLogos = ['openai', 'blackforest', 'runway', 'ideogram', 'lightricks', 'grok'];
 
@@ -446,26 +428,8 @@ function ModelDropdown({ selectedModel, onSelect, onClose, copy = en }) {
   const selectedEntry = videoModelPickerEntryByVariantId.get(selectedModel);
   const selectedModelProvider = selectedEntry?.family.provider || "all";
   const modelCategories = [
-    {
-      id: "all",
-      label: copy.categories.all,
-      entries: videoModelPickerEntries,
-    },
-    {
-      id: "t2v",
-      label: copy.categories.t2v,
-      entries: videoModelPickerEntries.filter((entry) => entry.variantsByMode.t2v && !getVeoToolConfiguration(entry.defaultVariant.model.id)),
-    },
-    {
-      id: "i2v",
-      label: copy.categories.i2v,
-      entries: videoModelPickerEntries.filter((entry) => entry.variantsByMode.i2v),
-    },
-    {
-      id: "v2v",
-      label: copy.categories.v2v,
-      entries: videoModelPickerEntries.filter((entry) => entry.variantsByMode.v2v || getVeoToolConfiguration(entry.defaultVariant.model.id)),
-    },
+    { id: "all", label: copy.categories.all, entries: videoModelPickerEntries },
+    { id: "t2v", label: copy.categories.t2v, entries: videoModelPickerEntries.filter((entry) => entry.variantsByMode.t2v) },
   ];
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [selectedProvider, setSelectedProvider] = useState(
@@ -524,8 +488,8 @@ function ModelDropdown({ selectedModel, onSelect, onClose, copy = en }) {
   const seenProviders = new Set();
   
   modelEntries.forEach(({ family }) => {
-    const pId = family.provider || 'muapi';
-    const pName = family.provider_name || 'Muapi';
+    const pId = family.provider || 'higgsfield';
+    const pName = family.provider_name || 'Higgsfield';
     if (!seenProviders.has(pId)) {
       seenProviders.add(pId);
       availableProviders.push({ id: pId, name: pName });
@@ -538,7 +502,7 @@ function ModelDropdown({ selectedModel, onSelect, onClose, copy = en }) {
     const { family } = entry;
     // 1. Filter by provider tab
     if (selectedProvider !== "all") {
-      const pId = family.provider || 'muapi';
+      const pId = family.provider || 'higgsfield';
       if (pId !== selectedProvider) return false;
     }
     // 2. Filter by search query
@@ -1302,13 +1266,13 @@ export default function VideoStudio({
       const stored = localStorage.getItem(PERSIST_KEY);
       if (stored) {
         const data = JSON.parse(stored);
-        let restoredMode = data.v2vMode ? "v2v" : data.imageMode ? "i2v" : "t2v";
+        let restoredMode = "t2v";
         let restoredModelId = data.selectedModel || defaultModel.id;
         let restoredWorkflowId = null;
         let restoredModel = defaultModel;
         let restoredFamilyId = defaultFamily.id;
         let restoredResolution = data.selectedResolution;
-        if (data.selectedModel) {
+        if (data.selectedModel && HIGGSFIELD_VIDEO_IDS.has(data.selectedModel)) {
           const restored = resolvePersistedVideoWorkflowSelection(
             migrateSeedanceResolutionSelection(data.selectedModel, data.selectedResolution),
             data.selectedWorkflowId || null,
@@ -2407,37 +2371,13 @@ export default function VideoStudio({
   const workflowMediaConfig = selectedWorkflowId
     ? getVideoWorkflowMediaConfig(currentModelObj, selectedWorkflowId)
     : null;
-  const canUploadImageReference = workflowMediaConfig
-    ? workflowMediaConfig.imageLimit > 0
-    : workflowFamily
-      ? currentModelCapabilities.image.maxItems > 0
-    : currentModelCapabilities.image.maxItems > 0 ||
-      (!v2vMode && selectedFamily.supports.i2v);
-  const imageTargetVariant = workflowFamily
-    ? selectedVariant
-    : currentModelCapabilities.image.maxItems > 0
-      ? selectedVariant
-      : getFamilyVariant(videoModelCatalog, selectedFamily, "i2v", selectedModel);
-  const imageUploadCapability = getModelMediaCapabilities(imageTargetVariant?.model).image;
-  const imageUploadLimit = workflowMediaConfig
-    ? workflowMediaConfig.imageLimit
-    : imageUploadCapability.separateLastItem
-      ? 1
-      : imageUploadCapability.maxItems;
-  const videoTargetVariant = workflowFamily
-    ? selectedVariant
-    : currentModelCapabilities.video.maxItems > 0
-      ? selectedVariant
-      : getFamilyVariant(videoModelCatalog, selectedFamily, "v2v", selectedModel);
-  const videoUploadLimit = workflowMediaConfig
-    ? workflowMediaConfig.videoLimit
-    : getModelMediaCapabilities(videoTargetVariant?.model).video.maxItems;
-  const audioUploadLimit = workflowMediaConfig
-    ? workflowMediaConfig.audioLimit
-    : currentModelCapabilities.audio.maxItems;
-  const showEndImageUpload = workflowMediaConfig
-    ? workflowMediaConfig.separateEndImage
-    : imageUploadCapability.separateLastItem;
+  const canUploadImageReference = false;
+  const imageTargetVariant = selectedVariant;
+  const imageUploadCapability = currentModelCapabilities.image;
+  const imageUploadLimit = 0;
+  const videoUploadLimit = 0;
+  const audioUploadLimit = 0;
+  const showEndImageUpload = false;
 
   const promptPlaceholder = selectedWorkflowId === "edit_video"
     ? copy.placeholders.editVideo
@@ -2953,7 +2893,7 @@ export default function VideoStudio({
                 >
                   <div className="w-4 h-4 rounded overflow-hidden shrink-0 flex items-center justify-center bg-white/5">
                     {(() => {
-                      const selectedModelProvider = selectedFamily.provider || 'muapi';
+                      const selectedModelProvider = selectedFamily.provider || 'higgsfield';
                       return PROVIDER_LOGOS[selectedModelProvider] ? (
                         <img 
                           src={PROVIDER_LOGOS[selectedModelProvider]} 

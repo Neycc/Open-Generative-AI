@@ -37,7 +37,7 @@ export async function pollForGenerationResult({
   onAuthRequired,
   fetchImpl = fetch,
 }) {
-  const pollUrl = `${baseUrl}/api/v1/predictions/${requestId}/result`;
+  const pollUrl = `${baseUrl}/requests/${encodeURIComponent(requestId)}/status`;
 
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     await wait(interval);
@@ -45,7 +45,7 @@ export async function pollForGenerationResult({
     let response;
     try {
       response = await fetchImpl(pollUrl, {
-        headers: { "Content-Type": "application/json", "x-api-key": apiKey },
+        headers: { "Content-Type": "application/json", Authorization: `Key ${apiKey}` },
       });
     } catch (error) {
       if (attempt === maxAttempts) throw error;
