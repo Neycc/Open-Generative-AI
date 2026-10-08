@@ -22,12 +22,31 @@ The app stores the key in browser storage and sends it to the app’s Higgsfield
 
 Official references: [Higgsfield API](https://higgsfield.ai/higgsfield-api) · [API quick start](https://open.higgsfield.ai/quick-start)
 
+## Install on Windows
+
+A Windows x64 installer is built automatically for pull requests and updates to the `main` branch:
+
+1. Open the repository’s [Actions](https://github.com/Neycc/Open-Generative-AI/actions) page.
+2. Select the latest successful **Build Windows installer** run.
+3. Download the `open-generative-ai-windows-x64` artifact and extract the ZIP.
+4. Run the included `.exe` installer.
+
+The installer lets you choose its installation folder. Windows local inference binaries are not bundled; cloud generation works after you add your Higgsfield API key in **Settings**.
+
+To build the installer yourself on Windows, install Node.js 20+, clone the repository with its submodules, run `npm run setup`, then run:
+
+```bash
+npm run electron:build:win
+```
+
+The installer will be written to `release/`.
+
 ## Run from source
 
 Prerequisites: Node.js 18 or later.
 
 ```bash
-git clone --recurse-submodules https://github.com/Anil-matcha/Open-Generative-AI.git
+git clone --recurse-submodules https://github.com/Neycc/Open-Generative-AI.git
 cd Open-Generative-AI
 npm run setup
 npm run dev
