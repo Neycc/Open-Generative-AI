@@ -26,7 +26,7 @@
     "vite:build": "vite build",
     "electron:dev": "npm run vite:build && electron .",
     "electron:build": "vite build && electron-builder --mac",
-    "electron:build:win": "vite build && electron-builder --win",
+    "electron:build:win": "vite build && electron-builder --win --x64",
     "electron:build:linux": "vite build && electron-builder --linux",
     "electron:build:linux:dir": "vite build && electron-builder --linux dir",
     "electron:build:linux:arm64:dir": "vite build && electron-builder --linux dir --arm64",
