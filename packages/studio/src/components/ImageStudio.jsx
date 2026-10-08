@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import toast, { Toaster } from "react-hot-toast";
-import { generateImage, generateI2I, uploadFile } from "../muapi.js";
+import { generateImage, generateI2I, uploadFile } from "../higgsfield.js";
 import { formatErrorMessage } from "../utils/formatError.js";
 import { scopedPersistKey, migrateLegacyPersistKey } from "../persistKey.js";
 import DrawModal from "./DrawModal.jsx";
@@ -22,13 +22,13 @@ import {
   getEffectsForI2IModel,
   getDefaultEffectForI2IModel,
   getI2IModelById,
-} from "../models.js";
+} from "../higgsfieldModels.js";
 import {
   getFamilyVariant,
   getImageReferenceVariant,
   imageModelCatalog,
-  imageModelPickerEntries,
-  imageModelPickerEntryByVariantId,
+  imageModelPickerEntries as allImageModelPickerEntries,
+  imageModelPickerEntryByVariantId as allImageModelPickerEntryByVariantId,
 } from "../modelFamilies.js";
 import {
   buildReferenceParams,
@@ -626,56 +626,25 @@ function UploadButton({ apiKey, maxImages, onSelect, onClear, initialUrls = [], 
 
 // ─── ModelDropdown ────────────────────────────────────────────────────────────
 
-const PROVIDER_LOGOS = {
-  openai: "https://cdn.muapi.ai/models/openai.png",
-  google: "https://cdn.muapi.ai/models/gemini.png",
-  kling: "https://cdn.muapi.ai/models/kling.png",
-  alibaba: "https://cdn.muapi.ai/models/alibaba.png",
-  bytedance: "https://cdn.muapi.ai/models/bytedance.png",
-  blackforest: "https://cdn.muapi.ai/models/bfl.png",
-  minimax: "https://cdn.muapi.ai/models/minimax.png",
-  suno: "https://cdn.muapi.ai/models/suno.png",
-  anthropic: "https://cdn.muapi.ai/models/claude.png",
-  meshy: "https://cdn.muapi.ai/models/meshy-3.png",
-  tripo3d: "https://cdn.muapi.ai/models/tripo3d.png",
-  grok: "https://cdn.muapi.ai/models/xai.png",
-  muapi: "https://cdn.muapi.ai/models/muapi.png",
-  midjourney: "https://cdn.muapi.ai/models/midjourney.png",
-  vidu: "https://cdn.muapi.ai/models/vidu.png",
-  runway: "https://cdn.muapi.ai/models/runway.png",
-  luma: "https://cdn.muapi.ai/models/luma.png",
-  ideogram: "https://cdn.muapi.ai/models/ideogram.png",
-  leonardoai: "https://cdn.muapi.ai/models/leonardoai.png",
-  hunyuan: "https://cdn.muapi.ai/models/hunyuan.png",
-  hidream: "https://cdn.muapi.ai/models/hidream.png",
-  lightricks: "https://cdn.muapi.ai/models/lightricks.png",
-  pixverse: "https://cdn.muapi.ai/models/pixverse.png",
-  reve: "https://cdn.muapi.ai/models/reve.png",
-  stability: "https://cdn.muapi.ai/models/stability.png"
-};
+const HIGGSFIELD_IMAGE_IDS = new Set(t2iModels.map((model) => model.id));
+const higgsfieldImageModelPickerEntries = allImageModelPickerEntries
+  .filter((entry) => [...entry.variantIds].some((id) => HIGGSFIELD_IMAGE_IDS.has(id)))
+  .map((entry) => ({ ...entry, family: { ...entry.family, provider: 'higgsfield', provider_name: 'Higgsfield' } }));
+const higgsfieldImageModelPickerEntryByVariantId = new Map(
+  [...allImageModelPickerEntryByVariantId.entries()].filter(([id]) => HIGGSFIELD_IMAGE_IDS.has(id))
+);
+
+const PROVIDER_LOGOS = { higgsfield: '' };
 
 const invertLogos = ['openai', 'blackforest', 'runway', 'ideogram', 'lightricks', 'grok'];
 
 function ModelDropdown({ selectedModel, onSelect, onClose, copy }) {
   const t = copy.modelDropdown;
   const [search, setSearch] = useState("");
-  const selectedEntry = imageModelPickerEntryByVariantId.get(selectedModel);
+  const selectedEntry = higgsfieldImageModelPickerEntryByVariantId.get(selectedModel);
   const modelCategories = [
-    {
-      id: "all",
-      label: t.categoryAll,
-      entries: imageModelPickerEntries,
-    },
-    {
-      id: "t2i",
-      label: t.categoryT2I,
-      entries: imageModelPickerEntries.filter((entry) => entry.variantsByMode.t2i),
-    },
-    {
-      id: "i2i",
-      label: t.categoryI2I,
-      entries: imageModelPickerEntries.filter((entry) => entry.variantsByMode.i2i),
-    },
+    { id: "all", label: t.categoryAll, entries: higgsfieldImageModelPickerEntries },
+    { id: "t2i", label: t.categoryT2I, entries: higgsfieldImageModelPickerEntries.filter((entry) => entry.variantsByMode.t2i) },
   ];
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [selectedProvider, setSelectedProvider] = useState("all");
@@ -732,8 +701,8 @@ function ModelDropdown({ selectedModel, onSelect, onClose, copy }) {
   const seenProviders = new Set();
   
   modelEntries.forEach(({ family }) => {
-    const pId = family.provider || 'muapi';
-    const pName = family.provider_name || 'Muapi';
+    const pId = family.provider || 'higgsfield';
+    const pName = family.provider_name || 'Higgsfield';
     if (!seenProviders.has(pId)) {
       seenProviders.add(pId);
       availableProviders.push({ id: pId, name: pName });
@@ -744,7 +713,7 @@ function ModelDropdown({ selectedModel, onSelect, onClose, copy }) {
     const { family } = entry;
     // 1. Filter by provider tab
     if (selectedProvider !== "all") {
-      const pId = family.provider || 'muapi';
+      const pId = family.provider || 'higgsfield';
       if (pId !== selectedProvider) return false;
     }
     // 2. Filter by search query
@@ -1062,8 +1031,7 @@ export default function ImageStudio({
       const stored = localStorage.getItem(PERSIST_KEY);
       if (stored) {
         const data = JSON.parse(stored);
-        if (data.imageMode !== undefined) setImageMode(data.imageMode);
-        if (data.selectedModelId) {
+        if (data.selectedModelId && HIGGSFIELD_IMAGE_IDS.has(data.selectedModelId)) {
           const restoredFamily = imageModelCatalog.familyByVariantId.get(data.selectedModelId);
           const restoredVariant = imageModelCatalog.variantById.get(data.selectedModelId);
           if (restoredFamily) {
@@ -1077,7 +1045,7 @@ export default function ImageStudio({
             );
           }
         }
-        if (data.selectedAr) setSelectedAr(data.selectedAr);
+        if (getAspectRatiosForModel(t2iModels[0].id).includes(data.selectedAr)) setSelectedAr(data.selectedAr);
         if (data.selectedQuality) setSelectedQuality(data.selectedQuality);
         if (data.selectedEffect) setSelectedEffect(data.selectedEffect);
         if (data.prompt) setPrompt(data.prompt);
@@ -1208,7 +1176,7 @@ export default function ImageStudio({
   const currentEffects = imageMode ? getEffectsForI2IModel(selectedModelId) : [];
   const showEffectBtn = currentEffects.length > 0;
   const selectedFamily = imageModelCatalog.familyById.get(selectedFamilyId) || initialFamily;
-  const selectedPickerEntry = imageModelPickerEntryByVariantId.get(selectedModelId);
+  const selectedPickerEntry = higgsfieldImageModelPickerEntryByVariantId.get(selectedModelId);
   const selectedModelDisplayName = selectedPickerEntry?.name || selectedFamily.name;
   const currentMode = imageMode ? "i2i" : "t2i";
   const selectedVariant = imageModelCatalog.variantById.get(selectedModelId);
@@ -1495,7 +1463,7 @@ export default function ImageStudio({
                     title={copy.gallery.download}
                     onClick={(e) => {
                       e.stopPropagation();
-                      downloadImage(entry.url, `muapi-${entry.id || idx}.jpg`);
+                      downloadImage(entry.url, `generated-${entry.id || idx}.jpg`);
                     }}
                     className="p-2 bg-black/60 backdrop-blur-md rounded-full text-white hover:bg-primary hover:text-black transition-all border border-white/10"
                   >
@@ -1533,7 +1501,7 @@ export default function ImageStudio({
                       kind: "download",
                       label: copy.gallery.download,
                       onSelect: () =>
-                        downloadImage(entry.url, `muapi-${entry.id || idx}.jpg`),
+                        downloadImage(entry.url, `generated-${entry.id || idx}.jpg`),
                     },
                     {
                       kind: "delete",
@@ -1638,7 +1606,7 @@ export default function ImageStudio({
               ))}
               
               {/* Main Upload Trigger */}
-              {referenceVariant && uploadedImageUrls.length < referenceImageLimit && (
+              {false && referenceVariant && uploadedImageUrls.length < referenceImageLimit && (
                 <UploadButton
                   apiKey={apiKey}
                   maxImages={referenceImageLimit}
@@ -1692,7 +1660,7 @@ export default function ImageStudio({
                 >
                   <div className="w-4 h-4 rounded overflow-hidden shrink-0 flex items-center justify-center bg-white/5">
                     {(() => {
-                      const selectedModelProvider = selectedFamily.provider || 'muapi';
+                      const selectedModelProvider = selectedFamily.provider || 'higgsfield';
                       return PROVIDER_LOGOS[selectedModelProvider] ? (
                         <img 
                           src={PROVIDER_LOGOS[selectedModelProvider]} 

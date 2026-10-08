@@ -1,4 +1,4 @@
-import { muapi } from '../lib/muapi.js';
+import { higgsfield } from '../lib/higgsfield.js';
 import { t2vModels, getAspectRatiosForVideoModel, getDurationsForModel, getResolutionsForVideoModel, i2vModels, getAspectRatiosForI2VModel, getDurationsForI2VModel, getResolutionsForI2VModel, v2vModels } from '../lib/models.js';
 import { AuthModal } from './AuthModal.js';
 import { t, tf } from '../lib/i18n.js';
@@ -39,7 +39,7 @@ export function VideoStudio() {
     const container = document.createElement('div');
     container.className = 'w-full h-full flex flex-col items-center justify-center bg-app-bg relative p-4 md:p-6 overflow-y-auto custom-scrollbar overflow-x-hidden';
 
-    // Cloud (Muapi) and local (Wan2GP) models live in separate lists; the
+    // Cloud (Higgsfield) and local (Wan2GP) models live in separate lists; the
     // "⚡ Local" toggle — shown only in the desktop app — picks which one the
     // model dropdown and generation use.
     const localT2V = isLocalAIAvailable() ? localT2VModels.map(adaptLocalToVideoEntry) : [];
@@ -72,7 +72,7 @@ export function VideoStudio() {
     let uploadedVideoUrl = null;
 
     const getCurrentModels = () => v2vMode ? v2vModels : (imageMode ? i2vList() : t2vList());
-    // Local Wan2GP entries don't live in the Muapi-derived helpers, so we
+    // Local Wan2GP entries don't live in the Higgsfield-derived helpers, so we
     // resolve aspect ratios off the catalog when the selected id is local.
     const getCurrentAspectRatios = (id) => {
         const local = getLocalModelById(id);
@@ -189,12 +189,12 @@ export function VideoStudio() {
             textarea.disabled = false;
         },
         // Local mode keeps the start frame on disk for Wan2GP; otherwise fall
-        // back to the Muapi-hosted upload.
-        uploadFn: (file) => useLocalModel ? localAI.uploadFileToWan2gp(file) : muapi.uploadFile(file),
+        // back to the Higgsfield-hosted upload.
+        uploadFn: (file) => useLocalModel ? localAI.uploadFileToWan2gp(file) : higgsfield.uploadFile(file),
         requireApiKey: () => !useLocalModel,
     });
-    topRow.appendChild(picker.trigger);
-    container.appendChild(picker.panel);
+    if (i2vModels.length > 0) topRow.appendChild(picker.trigger);
+    if (i2vModels.length > 0) container.appendChild(picker.panel);
 
     // --- End-Frame Upload Picker (FLF i2v models — kling/veo/seedance/etc.) ---
     // Shown only when imageMode is on AND the selected i2v model declares a
@@ -204,7 +204,7 @@ export function VideoStudio() {
         anchorContainer: container,
         onSelect: ({ url }) => { uploadedEndImageUrl = url; },
         onClear: () => { uploadedEndImageUrl = null; },
-        uploadFn: (file) => useLocalModel ? localAI.uploadFileToWan2gp(file) : muapi.uploadFile(file),
+        uploadFn: (file) => useLocalModel ? localAI.uploadFileToWan2gp(file) : higgsfield.uploadFile(file),
         requireApiKey: () => !useLocalModel,
     });
     endPicker.trigger.title = 'End frame (optional)';
@@ -318,7 +318,7 @@ export function VideoStudio() {
         const file = e.target.files[0];
         if (!file) return;
 
-        const apiKey = localStorage.getItem('muapi_key');
+        const apiKey = localStorage.getItem('higgsfield_api_key');
         if (!apiKey) {
             AuthModal(() => videoFileInput.click());
             return;
@@ -326,7 +326,7 @@ export function VideoStudio() {
 
         showVideoSpinner();
         try {
-            const url = await muapi.uploadFile(file);
+            const url = await higgsfield.uploadFile(file);
             uploadedVideoUrl = url;
             showVideoReady(file.name);
 
@@ -359,7 +359,7 @@ export function VideoStudio() {
         videoFileInput.value = '';
     };
 
-    topRow.appendChild(videoPickerBtn);
+    if (v2vModels.length > 0) topRow.appendChild(videoPickerBtn);
 
     const textarea = document.createElement('textarea');
     textarea.placeholder = 'Describe the video you want to create';
@@ -1130,7 +1130,7 @@ export function VideoStudio() {
         const pending = getPendingJobs('video');
         if (!pending.length) return;
 
-        const apiKey = localStorage.getItem('muapi_key');
+        const apiKey = localStorage.getItem('higgsfield_api_key');
         if (!apiKey) return; // can't poll without key; jobs remain for next time
 
         const banner = document.createElement('div');
@@ -1143,7 +1143,7 @@ export function VideoStudio() {
             const elapsedAttempts = Math.floor((Date.now() - job.submittedAt) / job.interval);
             const attemptsLeft = Math.max(1, job.maxAttempts - elapsedAttempts);
             try {
-                const result = await muapi.pollForResult(job.requestId, apiKey, attemptsLeft, job.interval);
+                const result = await higgsfield.pollForResult(job.requestId, apiKey, attemptsLeft, job.interval);
                 const url = result.outputs?.[0] || result.url || result.output?.url;
                 if (url) {
                     addToHistory({ id: job.requestId, url, ...job.historyMeta, timestamp: new Date().toISOString() });
@@ -1253,7 +1253,7 @@ export function VideoStudio() {
 
         const isLocal = useLocalModel && isWan2gpModelId(selectedModel);
 
-        // Local Wan2GP generations don't go through Muapi — skip the auth gate,
+        // Local Wan2GP generations don't go through Higgsfield — skip the auth gate,
         // but refuse models the engine reported as unavailable.
         if (isLocal) {
             if (!localAvailability.size) await refreshLocalAvailability();
@@ -1263,7 +1263,7 @@ export function VideoStudio() {
                 return;
             }
         } else {
-            const apiKey = localStorage.getItem('muapi_key');
+            const apiKey = localStorage.getItem('higgsfield_api_key');
             if (!apiKey) {
                 AuthModal(() => generateBtn.click());
                 return;
@@ -1326,7 +1326,7 @@ export function VideoStudio() {
                 const v2vParams = { model: selectedModel, video_url: uploadedVideoUrl, onRequestId };
                 if (model?.imageField && uploadedImageUrl) v2vParams.image_url = uploadedImageUrl;
                 if (model?.hasPrompt && prompt) v2vParams.prompt = prompt;
-                const res = await muapi.processV2V(v2vParams);
+                const res = await higgsfield.processV2V(v2vParams);
                 console.log('[VideoStudio] V2V response:', res);
                 if (res && res.url) {
                     if (capturedRequestId) removePendingJob(capturedRequestId);
@@ -1362,7 +1362,7 @@ export function VideoStudio() {
                 if (selectedMode) i2vParams.mode = selectedMode;
                 if (selectedEffectName) i2vParams.name = selectedEffectName;
 
-                const res = await muapi.generateI2V(i2vParams);
+                const res = await higgsfield.generateI2V(i2vParams);
                 console.log('[VideoStudio] I2V response:', res);
 
                 if (res && res.url) {
@@ -1405,7 +1405,7 @@ export function VideoStudio() {
             if (selectedQuality) params.quality = selectedQuality;
             if (selectedMode) params.mode = selectedMode;
 
-            const res = await muapi.generateVideo(params);
+            const res = await higgsfield.generateVideo(params);
 
             console.log('[VideoStudio] Full response:', res);
 
